@@ -44,12 +44,21 @@ impl Device {
 
     fn transact(&mut self, packet: &Packet) -> Result<Packet, Error> {
         self.send(packet)?;
-        //TODO buffer report packets
-        let response = self.recv()?;
-        if response.packet_type() == 0x40 | packet.packet_type() {
-            Ok(response)
-        } else {
-            Err(Error::BadResponse)
+        loop {
+            let response = self.recv()?;
+            let resp_class = response.packet_type() >> 6;
+            let resp_code = response.packet_type() & 0x3f;
+            if resp_class == 0b10 {
+                //TODO buffer report packets
+            } else if resp_class == 0b01 && resp_code == packet.packet_type() {
+                // normal response code
+                return Ok(response);
+            } else if resp_class == 0b11 && resp_code == packet.packet_type() {
+                // error response code
+                return Err(Error::ReturnedError);
+            } else {
+                log::warn!("unexpected packet received: {:?}", response);
+            }
         }
     }
 
@@ -134,11 +143,11 @@ pub enum Error {
     #[error("potential desync on serial port")]
     Desync,
 
-    #[error("received incorrect response for command")]
-    BadResponse,
-
     #[error("invalid value for argument")]
     InvalidArgument,
+
+    #[error("Device returned an error response")]
+    ReturnedError,
 }
 
 impl From<WritePacketError> for Error {
