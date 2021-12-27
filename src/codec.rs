@@ -154,18 +154,6 @@ impl<T> PacketCodec<T> {
     pub fn new(inner: T) -> Self {
         Self { inner }
     }
-
-    pub fn inner(&self) -> &T {
-        &self.inner
-    }
-
-    pub fn inner_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-
-    pub fn into_inner(self) -> T {
-        self.inner
-    }
 }
 
 impl<T> PacketCodec<T>

@@ -1,4 +1,4 @@
-pub mod codec;
+pub(crate) mod codec;
 
 use self::codec::{Packet, PacketCodec, ReadPacketError, WritePacketError, MAX_DATA_LEN};
 use serialport::SerialPort;
