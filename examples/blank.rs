@@ -1,3 +1,5 @@
+//! Blanks the display by turning off the backlights on the given device.
+
 use anyhow::Context;
 use cfa635::Device;
 use std::env::args;

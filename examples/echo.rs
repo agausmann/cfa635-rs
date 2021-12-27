@@ -1,3 +1,6 @@
+//! Sends lines of stdin to the device using the "Ping" command, and prints
+//! the device's response to stdout.
+
 use anyhow::Context;
 use cfa635::Device;
 use std::env::args;

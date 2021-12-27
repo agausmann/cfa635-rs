@@ -1,3 +1,5 @@
+//! Clears all text from the screen.
+
 use anyhow::Context;
 use cfa635::Device;
 use std::env::args;

@@ -16,6 +16,7 @@ pub enum ReadPacketError {
 }
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum WritePacketError {
     #[error("io error")]
     Io(#[from] std::io::Error),

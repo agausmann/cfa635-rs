@@ -1,3 +1,5 @@
+//! Reads stdin line-by-line, and displays those lines on the screen.
+
 use anyhow::Context;
 use cfa635::Device;
 use std::env::args;
@@ -15,7 +17,7 @@ fn main() -> anyhow::Result<()> {
     for result in handle.lines() {
         let line = result?;
         device.clear_screen()?;
-        device.set_text(0, 0, line.as_bytes())?;
+        device.set_text(0, 15, line.as_bytes())?;
     }
 
     Ok(())
