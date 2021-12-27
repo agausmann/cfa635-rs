@@ -212,11 +212,8 @@ where
             .write_all(&[packet.packet_type, packet.data_len])?;
         self.inner.write_all(packet.data())?;
         self.inner.write_all(&packet.crc())?;
+        self.inner.flush()?;
         Ok(())
-    }
-
-    pub fn flush(&mut self) -> Result<(), std::io::Error> {
-        self.inner.flush()
     }
 }
 
