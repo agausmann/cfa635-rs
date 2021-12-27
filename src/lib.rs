@@ -7,6 +7,8 @@ use thiserror::Error;
 
 pub const ROWS: u8 = 4;
 pub const COLUMNS: u8 = 20;
+pub const MAX_CONTRAST: u8 = 255;
+pub const MAX_BACKLIGHT: u8 = 100;
 
 pub struct Device {
     codec: PacketCodec<Box<dyn SerialPort>>,
@@ -76,6 +78,19 @@ impl Device {
         Ok(())
     }
 
+    pub fn set_contrast(&mut self, contrast: u8) -> Result<(), Error> {
+        self.transact(&Packet::new(0x0d, &[contrast]))?;
+        Ok(())
+    }
+
+    pub fn set_backlight(&mut self, screen: u8, keypad: u8) -> Result<(), Error> {
+        if screen > MAX_BACKLIGHT || keypad > MAX_BACKLIGHT {
+            return Err(Error::InvalidArgument);
+        }
+        self.transact(&Packet::new(0x0e, &[screen, keypad]))?;
+        Ok(())
+    }
+
     pub fn set_text(&mut self, row: u8, col: u8, text: &[u8]) -> Result<(), Error> {
         if row >= ROWS || col >= COLUMNS {
             return Err(Error::InvalidArgument);
@@ -89,6 +104,11 @@ impl Device {
         buffer[1] = row;
         buffer[2..len].copy_from_slice(&text);
         self.transact(&Packet::new(0x1f, &buffer[..len]))?;
+        Ok(())
+    }
+
+    pub fn save_boot_state(&mut self) -> Result<(), Error> {
+        self.transact(&Packet::new(0x04, &[]))?;
         Ok(())
     }
 }
