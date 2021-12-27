@@ -40,17 +40,24 @@ impl Device {
     fn transact(&mut self, packet: &Packet) -> Result<Packet, Error> {
         self.send(packet)?;
         //TODO buffer report packets
-        self.recv()
+        let response = self.recv()?;
+        if response.packet_type() == 0x40 | packet.packet_type() {
+            Ok(response)
+        } else {
+            Err(Error::BadResponse)
+        }
     }
 
     pub fn ping(&mut self, data: &[u8]) -> Result<Vec<u8>, Error> {
         // Max data is 16 bytes.
         let payload = &data[..data.len().min(16)];
         let pong = self.transact(&Packet::new(0x00, payload))?;
-        if pong.packet_type() != 0x40 {
-            return Err(Error::BadResponse);
-        }
         Ok(pong.data().to_owned())
+    }
+
+    pub fn clear_screen(&mut self) -> Result<(), Error> {
+        self.transact(&Packet::new(0x06, &[]))?;
+        Ok(())
     }
 }
 
