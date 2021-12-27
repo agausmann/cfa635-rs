@@ -18,9 +18,6 @@ pub enum ReadPacketError {
 pub enum WritePacketError {
     #[error("io error")]
     Io(#[from] std::io::Error),
-
-    #[error("packet has an invalid length")]
-    InvalidLength,
 }
 
 #[derive(Debug, Clone)]
@@ -199,9 +196,6 @@ where
     T: Write,
 {
     pub fn write_packet(&mut self, packet: &Packet) -> Result<(), WritePacketError> {
-        if packet.data_len as usize > MAX_DATA_LEN {
-            return Err(WritePacketError::InvalidLength);
-        }
         self.inner
             .write_all(&[packet.packet_type, packet.data_len])?;
         self.inner.write_all(packet.data())?;
