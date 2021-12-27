@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::{Read, Write};
 
 use thiserror::Error;
@@ -20,7 +21,7 @@ pub enum WritePacketError {
     Io(#[from] std::io::Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Packet {
     packet_type: u8,
     data_len: u8,
@@ -125,6 +126,16 @@ impl Packet {
     /// its data, returning `true` if they are equal.
     pub fn check_crc(&self) -> bool {
         self.calculate_crc() == self.crc
+    }
+}
+
+impl fmt::Debug for Packet {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Packet")
+            .field("type", &self.packet_type)
+            .field("data", &self.data())
+            .field("crc", &self.crc)
+            .finish()
     }
 }
 
