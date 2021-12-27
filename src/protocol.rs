@@ -23,7 +23,7 @@ pub enum WritePacketError {
     InvalidLength,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Packet {
     packet_type: u8,
     data_len: u8,
@@ -131,40 +131,48 @@ impl Packet {
     }
 }
 
-pub struct PacketReader<R> {
-    reader: R,
+impl PartialEq for Packet {
+    fn eq(&self, other: &Self) -> bool {
+        self.packet_type == other.packet_type && self.data() == other.data()
+    }
 }
 
-impl<R> PacketReader<R>
+pub struct PacketCodec<T> {
+    inner: T,
+}
+
+impl<T> PacketCodec<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
+impl<T> PacketCodec<T>
 where
-    R: Read,
+    T: Read,
 {
-    pub fn new(reader: R) -> Self {
-        Self { reader }
-    }
-
-    pub fn into_inner(self) -> R {
-        self.reader
-    }
-
     pub fn read_packet(&mut self) -> Result<Packet, ReadPacketError> {
         let mut packet_type = [0u8; 1];
-        self.reader.read_exact(&mut packet_type)?;
+        self.inner.read_exact(&mut packet_type)?;
         let packet_type = u8::from_le_bytes(packet_type);
 
         let mut data_len = [0u8; 1];
-        self.reader.read_exact(&mut data_len)?;
+        self.inner.read_exact(&mut data_len)?;
         let data_len = u8::from_le_bytes(data_len);
         if data_len as usize > MAX_DATA_LEN {
             return Err(ReadPacketError::InvalidPacket);
         }
 
         let mut data_array = [0u8; MAX_DATA_LEN];
-        self.reader
+        self.inner
             .read_exact(&mut data_array[..data_len as usize])?;
 
         let mut crc = [0u8; 2];
-        self.reader.read_exact(&mut crc)?;
+        self.inner.read_exact(&mut crc)?;
 
         let packet = Packet {
             packet_type,
@@ -178,35 +186,23 @@ where
     }
 }
 
-pub struct PacketWriter<W> {
-    writer: W,
-}
-
-impl<W> PacketWriter<W>
+impl<T> PacketCodec<T>
 where
-    W: Write,
+    T: Write,
 {
-    pub fn new(writer: W) -> Self {
-        Self { writer }
-    }
-
-    pub fn into_inner(self) -> W {
-        self.writer
-    }
-
     pub fn write_packet(&mut self, packet: &Packet) -> Result<(), WritePacketError> {
         if packet.data_len as usize > MAX_DATA_LEN {
             return Err(WritePacketError::InvalidLength);
         }
-        self.writer
+        self.inner
             .write_all(&[packet.packet_type, packet.data_len])?;
-        self.writer.write_all(packet.data())?;
-        self.writer.write_all(&packet.crc())?;
+        self.inner.write_all(packet.data())?;
+        self.inner.write_all(&packet.crc())?;
         Ok(())
     }
 
     pub fn flush(&mut self) -> Result<(), std::io::Error> {
-        self.writer.flush()
+        self.inner.flush()
     }
 }
 
@@ -250,11 +246,11 @@ mod tests {
         let test_packet = Packet::new(0x00, b"Hello World");
         let mut buffer = Vec::new();
         {
-            let mut writer = PacketWriter::new(&mut buffer);
+            let mut writer = PacketCodec::new(&mut buffer);
             writer.write_packet(&test_packet).expect("write failed");
         }
 
-        let mut reader = PacketReader::new(buffer.as_slice());
+        let mut reader = PacketCodec::new(buffer.as_slice());
         let read_packet = reader.read_packet().expect("read failed");
         assert!(read_packet.check_crc());
         assert_eq!(read_packet, test_packet);
