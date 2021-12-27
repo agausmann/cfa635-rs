@@ -2,6 +2,7 @@ pub(crate) mod codec;
 
 use self::codec::{Packet, PacketCodec, ReadPacketError, WritePacketError, MAX_DATA_LEN};
 use serialport::SerialPort;
+use std::collections::VecDeque;
 use std::time::Duration;
 use thiserror::Error;
 
@@ -21,6 +22,7 @@ pub const NUM_COLUMNS: u8 = 20;
 
 pub struct Device {
     codec: PacketCodec<Box<dyn SerialPort>>,
+    report_buffer: VecDeque<Report>,
 }
 
 impl Device {
@@ -37,6 +39,7 @@ impl Device {
             .open()?;
         Ok(Self {
             codec: PacketCodec::new(port),
+            report_buffer: VecDeque::new(),
         })
     }
 
@@ -64,7 +67,9 @@ impl Device {
             let resp_class = response.packet_type() >> 6;
             let resp_code = response.packet_type() & 0x3f;
             if resp_class == 0b10 {
-                //TODO buffer report packets
+                if let Some(report) = Report::from_raw(&response) {
+                    self.report_buffer.push_back(report);
+                }
             } else if resp_class == 0b01 && resp_code == packet.packet_type() {
                 // normal response code
                 return Ok(response);
@@ -107,6 +112,8 @@ impl Device {
     /// - Screen contrast ([`Device::set_contrast`]).
     ///
     /// - Screen backlight ([`Device::set_backlight`]).
+    ///
+    /// - Report configuration ([`Device::configure_key_reporting`])
     pub fn save_boot_state(&mut self) -> Result<(), Error> {
         self.transact(&Packet::new(0x04, &[]))?;
         Ok(())
@@ -215,6 +222,34 @@ impl Device {
         self.transact(&Packet::new(0x0e, &[screen, keypad]))?;
         Ok(())
     }
+
+    /// Configure which key events should be reported by the device.
+    ///
+    /// Any key code that is present in `press` or `release` will be "enabled"
+    /// and will be reported for the respective event. Any key code not present
+    /// will likewise be "disabled".
+    pub fn configure_key_reporting(&mut self, press: &[Key], release: &[Key]) -> Result<(), Error> {
+        let press_mask = press.iter().map(Key::mask).fold(0, |a, b| a | b);
+        let release_mask = release.iter().map(Key::mask).fold(0, |a, b| a | b);
+        self.transact(&Packet::new(0x17, &[press_mask, release_mask]))?;
+        Ok(())
+    }
+
+    /// Returns the next report packet, or `None` if there are none available
+    /// right now.
+    pub fn poll_report(&mut self) -> Result<Option<Report>, Error> {
+        if let Some(report) = self.report_buffer.pop_front() {
+            Ok(Some(report))
+        } else {
+            while self.codec.inner().bytes_to_read()? > 0 {
+                let packet = self.recv()?;
+                if let Some(report) = Report::from_raw(&packet) {
+                    return Ok(Some(report));
+                }
+            }
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -224,6 +259,70 @@ pub enum CursorStyle {
     BlinkingBlock = 1,
     StaticUnderscore = 2,
     BlinkingUnderscore = 3,
+}
+
+#[derive(Debug, Clone)]
+pub enum Report {
+    KeyActivity { key: Key, pressed: bool },
+}
+
+impl Report {
+    pub fn from_raw(packet: &Packet) -> Option<Self> {
+        match packet.packet_type() {
+            0x80 => {
+                let data = match packet.data().get(0) {
+                    Some(&x) => x,
+                    None => {
+                        log::warn!("not enough bytes for a key activity report");
+                        return None;
+                    }
+                };
+                let (key, pressed) = match data {
+                    1 => (Key::Up, true),
+                    2 => (Key::Down, true),
+                    3 => (Key::Left, true),
+                    4 => (Key::Right, true),
+                    5 => (Key::Enter, true),
+                    6 => (Key::Exit, true),
+                    7 => (Key::Up, false),
+                    8 => (Key::Down, false),
+                    9 => (Key::Left, false),
+                    10 => (Key::Right, false),
+                    11 => (Key::Enter, false),
+                    12 => (Key::Exit, false),
+                    _ => {
+                        log::warn!("unknown key code {:?}", data);
+                        return None;
+                    }
+                };
+                Some(Self::KeyActivity { key, pressed })
+            }
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Key {
+    Up,
+    Down,
+    Left,
+    Right,
+    Enter,
+    Exit,
+}
+
+impl Key {
+    fn mask(&self) -> u8 {
+        match self {
+            Self::Up => 0x01,
+            Self::Enter => 0x02,
+            Self::Exit => 0x04,
+            Self::Left => 0x08,
+            Self::Right => 0x10,
+            Self::Down => 0x20,
+        }
+    }
 }
 
 #[derive(Debug, Error)]

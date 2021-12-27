@@ -154,6 +154,10 @@ impl<T> PacketCodec<T> {
     pub fn new(inner: T) -> Self {
         Self { inner }
     }
+
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
 }
 
 impl<T> PacketCodec<T>
