@@ -29,6 +29,7 @@ pub struct Packet {
     data_len: u8,
     data_array: [u8; MAX_DATA_LEN],
     crc: [u8; 2],
+    trusted_crc: bool,
 }
 
 impl Packet {
@@ -39,6 +40,7 @@ impl Packet {
             data_len: data.len() as u8,
             data_array: [0; MAX_DATA_LEN],
             crc: [0; 2],
+            trusted_crc: false,
         };
         packet.data_array[..data.len()].copy_from_slice(data);
         packet.set_crc();
@@ -111,6 +113,15 @@ impl Packet {
     /// Sets the `crc` field using `calculate_crc`.
     pub(crate) fn set_crc(&mut self) {
         self.crc = self.calculate_crc();
+        self.trusted_crc = true;
+    }
+
+    pub(crate) fn crc(&self) -> [u8; 2] {
+        if self.trusted_crc {
+            self.crc
+        } else {
+            self.calculate_crc()
+        }
     }
 
     /// Compares the packet's stored (received) CRC with one calculated from
@@ -160,6 +171,7 @@ where
             data_len,
             data_array,
             crc,
+            trusted_crc: false,
         };
 
         Ok(packet)
@@ -189,7 +201,7 @@ where
         self.writer
             .write_all(&[packet.packet_type, packet.data_len])?;
         self.writer.write_all(packet.data())?;
-        self.writer.write_all(&packet.calculate_crc())?;
+        self.writer.write_all(&packet.crc())?;
         Ok(())
     }
 
