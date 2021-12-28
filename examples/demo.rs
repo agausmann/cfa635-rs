@@ -70,11 +70,14 @@ impl Menu {
             (entry.setter)(&mut device, entry.value)?;
         }
 
-        Ok(Self {
+        let mut menu = Self {
             device,
             entries,
             current_index: 0,
-        })
+        };
+        menu.send_name()?;
+        menu.send_value()?;
+        Ok(menu)
     }
 
     fn run(&mut self) -> anyhow::Result<()> {
