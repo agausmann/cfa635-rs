@@ -1,17 +1,12 @@
 //! Sends lines of stdin to the device using the "Ping" command, and prints
 //! the device's response to stdout.
 
-use anyhow::Context;
-use cfa635::Device;
-use std::env::args;
+mod common;
+
 use std::io::{stdin, BufRead};
 
 fn main() -> anyhow::Result<()> {
-    env_logger::init();
-
-    let mut args = args();
-    let path = args.nth(1).context(USAGE)?;
-    let mut device = Device::new(path)?;
+    let mut device = common::initialize()?;
 
     let stdin = stdin();
     let handle = stdin.lock();
@@ -23,5 +18,3 @@ fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
-
-const USAGE: &str = "usage: [port]";

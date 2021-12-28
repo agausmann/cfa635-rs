@@ -1,18 +1,9 @@
 //! Clears all text from the screen.
 
-use anyhow::Context;
-use cfa635::Device;
-use std::env::args;
+mod common;
 
 fn main() -> anyhow::Result<()> {
-    env_logger::init();
-
-    let mut args = args();
-    let path = args.nth(1).context(USAGE)?;
-    let mut device = Device::new(path)?;
+    let mut device = common::initialize()?;
     device.clear_screen()?;
-
     Ok(())
 }
-
-const USAGE: &str = "usage: [port]";
