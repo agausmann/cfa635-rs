@@ -8,17 +8,24 @@ use thiserror::Error;
 
 /// How many rows (lines) the display has.
 ///
-/// Rows are numbered with zero (0) at the top and increasing as you move down.
-/// Acceptable values are in the range `0..NUM_ROWS` (note the exclusive upper
-/// bound).
+/// Rows are numbered starting with zero (0) at the top and increasing as you
+/// move down. Acceptable values are in the range `0..NUM_ROWS` (note the
+/// exclusive upper bound).
 pub const NUM_ROWS: u8 = 4;
 
 /// How many columns (characters per row) the display has.
 ///
-/// Columns are numbered with zero (0) at the left and increasing as you move
-/// right. Acceptable values are in the range `0..NUM_COLUMNS` (note the
-/// exclusive upper bound).
+/// Columns are numbered starting with zero (0) at the left and increasing as
+/// you move right. Acceptable values are in the range `0..NUM_COLUMNS` (note
+/// the exclusive upper bound).
 pub const NUM_COLUMNS: u8 = 20;
+
+/// How many indicator LEDs the display has.
+///
+/// Numbered starting with zero (0) at the top and increasing as you move down.
+/// Acceptable valuse are in the range `0..NUM_LEDS` (note the exclusive upper
+/// bound).
+pub const NUM_LEDS: u8 = 4;
 
 pub struct Device {
     codec: PacketCodec<Box<dyn SerialPort>>,
@@ -249,6 +256,32 @@ impl Device {
             }
             Ok(None)
         }
+    }
+
+    /// Set the state of an indicator LED.
+    ///
+    /// The brightness of the red and green components is a value between 0
+    /// (off) and 100 (max brightness). A value higher than 100 will be
+    /// interpreted as max brightness.
+    ///
+    /// # Errors
+    ///
+    /// - `InvalidArgument` - If the LED index is out of bounds (as
+    /// defined by [`NUM_LEDS`]).
+    pub fn set_led(&mut self, index: u8, red: u8, green: u8) -> Result<(), Error> {
+        if index >= NUM_LEDS {
+            return Err(Error::InvalidArgument);
+        }
+        let (red_gpio, green_gpio) = match index {
+            0 => (12, 11),
+            1 => (10, 9),
+            2 => (8, 7),
+            3 => (6, 5),
+            _ => unreachable!(),
+        };
+        self.transact(&Packet::new(0x22, &[red_gpio, red]))?;
+        self.transact(&Packet::new(0x22, &[green_gpio, green]))?;
+        Ok(())
     }
 }
 
