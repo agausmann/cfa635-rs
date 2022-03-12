@@ -23,7 +23,7 @@ pub const NUM_COLUMNS: u8 = 20;
 /// How many indicator LEDs the display has.
 ///
 /// Numbered starting with zero (0) at the top and increasing as you move down.
-/// Acceptable valuse are in the range `0..NUM_LEDS` (note the exclusive upper
+/// Acceptable values are in the range `0..NUM_LEDS` (note the exclusive upper
 /// bound).
 pub const NUM_LEDS: u8 = 4;
 
